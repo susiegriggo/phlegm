@@ -11,7 +11,7 @@ cd test_data_search
 qsub -v DIR=../test_data_fasta ../src/collab_search_dir.sh
 
 3. Generate an alignment for each number of subunits to test
-
+bash src/generate_alignments.sh test_data_search/  test_data_alignments
 
 4. Colabbatch
 

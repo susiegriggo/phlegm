@@ -1,7 +1,10 @@
 # phlegm
-Phage Homomer Likelihood Estimator and Generator Method 
+**P**hage **H**omomer **L**ikelihood **E**stimator and **G**enerator **M**ethod 
+<p align="center">
+  <img src="https://github.com/susiegriggo/phlegm/blob/main/phlegm.png" width="600" title="phlegm logo" alt="phlegm logo">
+</p> 
 
-
+## How-to
 1. split fasta file into separate fasta files
 bash src/split_fasta.sh test_data/test.faa test_data_fasta
 
@@ -15,4 +18,6 @@ bash src/generate_alignments.sh test_data_search/  test_data_alignments
 
 4. Colabbatch
 
-5. Run metrics and state prediction
+5. Run metrics
+
+6. Compare metrics to make state prediction for each sequence 

@@ -10,6 +10,20 @@ import pickle
 import json
 import numpy as np 
 import re 
+import tarfile
+import os
+import tempfile
+import shutil
+
+def extract_tar_gz(input_path):
+    if tarfile.is_tarfile(input_path):
+        with tarfile.open(input_path, "r:gz") as tar:
+            temp_dir = tempfile.mkdtemp()  # Create a temporary directory
+            tar.extractall(temp_dir)  # Extract the contents
+            return temp_dir
+    else:
+        raise ValueError(f"{input_path} is not a valid .tar.gz file")
+
 
 @click.command() 
 @click.option('--input', '-i', type=click.Path(exists=True), help='Path to the input file or directory')
@@ -19,6 +33,14 @@ import re
 
 def main(input, output, max_subunits, num_structures): 
 
+    # Check if input is a .tar.gz file and extract it
+    if input.endswith('.tar.gz'):
+        try:
+            input = extract_tar_gz(input)  # Extract the tar.gz file
+        finally:
+            # Clean up temporary directory later
+            pass
+    
     # read the files in the input
     files = glob.glob(input + '/*')
 

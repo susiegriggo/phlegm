@@ -30,8 +30,8 @@ def extract_tar_gz(input_path):
 @click.option('--output', '-o', type=click.Path(), help='Name of output pickle file containing metrics')
 @click.option('--max_subunits', '-m', type=int, help='Maximum number of subunits in a complex')
 @click.option('--num_structures', '-n', type=int, help='Number of structures to consider for deach subunit size', default=3)
-
-def main(input, output, max_subunits, num_structures): 
+@click.option('--prefix', '-p', type=str, help='prefix used in colab output')
+def main(input, output, max_subunits, num_structures, prefix): 
 
     # Check if input is a .tar.gz file and extract it
     if input.endswith('.tar.gz'):
@@ -42,10 +42,9 @@ def main(input, output, max_subunits, num_structures):
             pass
     
     # read the files in the input
-    files = glob.glob(input + '/*')
-
+    files = glob.glob(input + '/*') 
     # get the prefix from the directory name 
-    prefix = input + re.split('/', input)[-2]
+    #prefix = input + re.split('/', input)[-2]
 
     # dictionary to store the metrics 
     sequence_metrics = dict() 

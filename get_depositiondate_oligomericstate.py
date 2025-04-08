@@ -10,18 +10,33 @@ from collections import Counter
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Load and process pharokka data
-pharokka = pd.read_csv('/home/grig0076/scratch/phlegm/all_pdb/pharokka/pharokka_proteins_full_merged_output.tsv', sep='\t')
-pharokka_phrog = pharokka[pharokka['phrog'] != 'No_PHROGs_HMM']
-pharokka_phrog['entry'] = pharokka_phrog['ID'].apply(lambda x: re.split('_', x)[0])
-pharokka_phrog = pharokka_phrog[pharokka_phrog.index.isin(pharokka_phrog.drop('ID', axis=1).drop_duplicates().index)]
+#pharokka = pd.read_csv('/home/grig0076/scratch/phlegm/all_pdb/pharokka/pharokka_proteins_full_merged_output.tsv', sep='\t')
+#pharokka_phrog = pharokka[pharokka['phrog'] != 'No_PHROGs_HMM']
+#pharokka_phrog['entry'] = pharokka_phrog['ID'].apply(lambda x: re.split('_', x)[0])
+#pharokka_phrog = pharokka_phrog[pharokka_phrog.index.isin(pharokka_phrog.drop('ID', axis=1).drop_duplicates().index)]
 
 # Identify homomeric complexes
-entry_chain_counts = Counter(pharokka_phrog['entry'])
-heteromers = {entry for entry, count in entry_chain_counts.items() if count > 1}
-homomeric_entries = set(entry_chain_counts.keys()) - heteromers
+#entry_chain_counts = Counter(pharokka_phrog['entry'])
+#heteromers = {entry for entry, count in entry_chain_counts.items() if count > 1}
+#homomeric_entries = set(entry_chain_counts.keys()) - heteromers
+
+#mmseqs_phrogs = pd.read_csv('/home/grig0076/scratch/phlegm/all_pdb/mmseqs/results.tsv', sep='\t', header=None)
+#mmseqs_phrogs.columns = ['phrog', 'pdb_id','alnScore', 'seqIdentity', 'eVal', 'qStart','qEnd','qLen','tStart','tEnd','tLen'] 
+#mmseqs_phrogs['pdb'] = [re.split('_', p)[0] for p  in mmseqs_phrogs['pdb_id']]  
+
+# Load the m8 file
+df = pd.read_csv("/home/grig0076/scratch/phlegm/PHROGs/phrog_represenative_pdb_seqres_minseqid0.5_c0.8.m8", sep="\t", header=None)
+df.columns = [
+    "query", "target", "pident", "alnlen", "mismatch", "gapopen",
+    "qstart", "qend", "tstart", "tend", "evalue", "bitscore"
+]
+df['pdb'] = [re.split('_', p)[0] for p  in df['target']]  
+
 
 # List of PDB IDs
-pdb_ids = list(homomeric_entries)
+#pdb_ids = list(set(mmseqs_phrogs['pdb']))
+pdb_ids = list(set(df['pdb']))
+print('Number of pdb ids to get: ' + str(len(pdb_ids)))
 
 def fetch_pdb_info(pdb_id):
     """Fetch deposition date and oligomeric states for all assemblies from RCSB PDB API."""
@@ -71,7 +86,7 @@ def fetch_pdb_info(pdb_id):
 # Fetch data for all PDB IDs
 results = {}
 batch_size = 1000
-output_file = "/home/grig0076/scratch/phlegm/all_pdb/pharokka/pdb_oligomeric_states.pkl"
+output_file = "/home/grig0076/scratch/phlegm/all_pdb/pharokka/pdb_oligomeric_states_mmseqs2_2025-04-08.pkl"
 
 for i, pdb_id in enumerate(pdb_ids, start=1):
     results[pdb_id] = fetch_pdb_info(pdb_id)
@@ -83,7 +98,8 @@ for i, pdb_id in enumerate(pdb_ids, start=1):
         with open(output_file, 'wb') as f:
             pickle.dump(results, f)
         
-        results.clear()
+        # Comment out the line that clears the results dictionary
+        # results.clear()
     
     time.sleep(0.2)
 

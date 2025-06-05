@@ -25,7 +25,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 #mmseqs_phrogs['pdb'] = [re.split('_', p)[0] for p  in mmseqs_phrogs['pdb_id']]  
 
 # Load the m8 file
-df = pd.read_csv("/home/grig0076/scratch/phlegm/PHROGs/phrog_represenative_pdb_seqres_minseqid0.5_c0.8.m8", sep="\t", header=None)
+df = pd.read_csv("/home/grig0076/scratch/phlegm/PHROGs/phrog_represenative_pdb_seqres_minseqid0.3_c0.4.m8", sep="\t", header=None)
 df.columns = [
     "query", "target", "pident", "alnlen", "mismatch", "gapopen",
     "qstart", "qend", "tstart", "tend", "evalue", "bitscore"
@@ -101,6 +101,6 @@ for i, pdb_id in enumerate(pdb_ids, start=1):
         # Comment out the line that clears the results dictionary
         # results.clear()
     
-    time.sleep(0.2)
+    time.sleep(1.0)
 
 logging.info(f"Processing complete. Results saved to {output_file}")

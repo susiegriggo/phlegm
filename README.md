@@ -21,3 +21,15 @@ bash src/generate_alignments.sh test_data_search/  test_data_alignments
 5. Run metrics
 
 6. Compare metrics to make state prediction for each sequence 
+
+### Acknowledgments
+
+This project includes code adapted from [FoldDock](https://gitlab.com/ElofssonLab/FoldDock), originally licensed under the Apache License, Version 2.0.
+
+Copyright 2021 Patrick Bryant, Gabriele Pozzati and Arne Elofsson
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at:
+
+   http://www.apache.org/licenses/LICENSE-2.0

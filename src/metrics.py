@@ -1,3 +1,6 @@
+# Modified from: original_file.py from Project Name (https://github.com/user/repo)
+# Original License: Apache License 2.0
+# Changes made by Susanna Grigson on 8 October 2024: Copy functions for metrics: read_pdb, calc_pdockq, calc_pdockq_multichain 
 #!/usr/bin/env python 
 
 """

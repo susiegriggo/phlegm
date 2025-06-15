@@ -24,6 +24,8 @@ bash src/generate_alignments.sh test_data_search/  test_data_alignments
 
 ### Acknowledgments
 
+Thankyou to Laura Inglis for designing the PHELGM logo! 
+
 This project includes code adapted from [FoldDock](https://gitlab.com/ElofssonLab/FoldDock), originally licensed under the Apache License, Version 2.0.
 
 Copyright 2021 Patrick Bryant, Gabriele Pozzati and Arne Elofsson

@@ -70,7 +70,20 @@ The `predict_oligomeric_state.py` script will:
 ### Scripts
 
 #### extract_metrics.py
-Extracts comprehensive metrics from AlphaFold Colab output including ipTM, pTM, pDockQ2, and interface contacts.
+**Purpose**: Comprehensive analysis script that extracts detailed metrics from AlphaFold Colab output for in-depth structural analysis and research.
+
+**When to use**: 
+- When you need detailed structural metrics for research/analysis
+- For benchmarking or validating predictions
+- When studying interface quality, contacts, or other structural properties
+- For generating datasets for machine learning or statistical analysis
+
+**What it computes**:
+- ipTM, pTM, mean/median pLDDT scores
+- pDockQ2 scores (per chain)
+- Interface contacts at multiple distance thresholds (1-9 Å)
+- Average interface PAE values
+- Maximum PAE values
 
 Usage:
 ```bash
@@ -79,7 +92,19 @@ python extract_metrics.py -i results.tar.gz -o metrics_output -p protein_name
 ```
 
 #### predict_oligomeric_state.py
-Predicts oligomeric state based on ipTM scores using the approach from the predict_phrogs.ipynb notebook. Applies the 0.65 ipTM threshold and bins results into oligomeric state categories (Monomer, 2-mer, 3-mer, 4-mer, 5-6-mer, 7+-mer).
+**Purpose**: Fast prediction script that determines oligomeric state using only ipTM scores and the validated threshold approach.
+
+**When to use**:
+- When you just need oligomeric state predictions (most common use case)
+- For high-throughput screening of protein oligomerization
+- When computational resources or time are limited
+- For automated pipelines that need simple yes/no oligomer classifications
+
+**What it computes**:
+- ipTM scores only
+- Mean ipTM per subunit count
+- Oligomeric state prediction with confidence binning
+- Simple classification (Monomer, 2-mer, 3-mer, 4-mer, 5-6-mer, 7+-mer)
 
 Usage:
 ```bash
@@ -93,18 +118,7 @@ python predict_oligomeric_state.py -i results.tar.gz -o predictions.pkl
 python predict_oligomeric_state.py -i /path/to/output -p my_protein -t 0.7 -o results.pkl
 ```
 
-Options:
-- `-i, --input`: Path to directory or tar.gz file containing AlphaFold output
-- `-o, --output`: Optional output pickle file to save results
-- `-p, --prefix`: Prefix used in colab output (auto-detected if not provided)
-- `-t, --threshold`: ipTM threshold for confident prediction (default: 0.65)
-- `-m, --min-structures`: Minimum number of structures needed for prediction (default: 2)
-
-Output contains:
-- `predicted_state_bin`: Binned oligomeric state (e.g., "2-mer", "5-6-mer")
-- `max_iptm`: Highest mean ipTM score found
-- `max_iptm_subunits`: Subunit count with highest mean ipTM
-- `per_subunits_mean_iptm`: Mean ipTM scores for each subunit count tested
+**Recommendation**: Use `predict_oligomeric_state.py` for most applications unless you specifically need the additional structural metrics provided by `extract_metrics.py`.
 
 ### Dependencies
 

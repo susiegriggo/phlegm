@@ -1,0 +1,25 @@
+
+ ********************************************************************
+ * US-align (Version 20241108)                                      *
+ * Universal Structure Alignment of Proteins and Nucleic Acids      *
+ * Reference: C Zhang, M Shine, AM Pyle, Y Zhang. (2022) Nat Methods*
+ *            C Zhang, AM Pyle (2022) iScience.                     *
+ * Please email comments and suggestions to zhang@zhanggroup.org    *
+ ********************************************************************
+
+Name of Structure_1: phrog_dimers/phrog_1856/phrog_1856.2_unrelaxed_rank_001_alphafold2_multimer_v3_model_3_seed_000.pdb:1,A:1,B (to be superimposed onto Structure_2)
+Name of Structure_2: dimer_validation_structures/7xl7.pdb:1,A:1,B
+Length of Structure_1: 124 residues
+Length of Structure_2: 107 residues
+
+Aligned length= 107, RMSD=   1.04, Seq_ID=n_identical/n_aligned= 0.757
+TM-score= 0.82012 (normalized by length of Structure_1: L=124, d0=4.12)
+TM-score= 0.94334 (normalized by length of Structure_2: L=107, d0=3.80)
+(You should use TM-score normalized by length of the reference structure)
+
+(":" denotes residue pairs of d < 5.0 Angstrom, "." denotes other aligned residues)
+MKEGYYWIQHNGVVQVAYYTNDTVDDLESGQLIVGIWHLTRGDDICHNGEAEVLSGPLQSPV*MKEGYYWIQHNGVVQVAYYTNDTVDDLESGQLIVGIWHLTRGDDICHNGEAEVLSGPLQSPV*
+::::::::::::::::::::::::::    ::::::::::::::::::::::::::::::::*:::::::::::::::::::::             ::::::::::::::::::::::::::::*
+MKEGFYWIQHNGRVQVAYYTHGVTED----QTIIGVWHLTQGDDICHNGEAEILAGPLEPPI*MKEGFYWIQHNGRVQVAYYTH-------------GVWHLTQGDDICHNGEAEILAGPLEPPI*
+
+#Total CPU time is  0.07 seconds

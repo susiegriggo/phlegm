@@ -1,0 +1,14 @@
+#!/usr/bin/env chimerax --script
+open "phrog_30232_aligned.pdb" name structure1
+open "dimer_validation_structures/7xmw.pdb" name structure2
+hide all atoms
+hide all bonds
+cartoon style protein modeh default arrows f xsect oval width 1 thick 1
+cartoon style nucleic xsect oval width 1 thick 1
+hide all cartoon
+show #1 cartoon
+show #2 cartoon
+color #1 blue
+color #2 red
+set bgColor white
+

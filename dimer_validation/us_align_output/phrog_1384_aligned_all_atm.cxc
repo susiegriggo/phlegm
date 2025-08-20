@@ -1,0 +1,14 @@
+#!/usr/bin/env chimerax --script
+open "phrog_1384_aligned.pdb" name structure1
+open "dimer_validation_structures/8bv8.pdb" name structure2
+hide all bonds
+hide all atoms
+hide all cartoon
+show #1 cartoon
+show #1 & nucleic cartoon,bonds
+show #2 cartoon
+show #2 & nucleic cartoon,bonds
+color #1 blue
+color #2 red
+set bgColor white
+

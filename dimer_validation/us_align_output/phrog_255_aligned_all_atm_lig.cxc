@@ -1,0 +1,8 @@
+#!/usr/bin/env chimerax --script
+open "phrog_255_aligned.pdb" name structure1
+open "dimer_validation_structures/8kel.pdb" name structure2
+show solvent atoms,bonds
+color #1 blue
+color #2 red
+set bgColor white
+

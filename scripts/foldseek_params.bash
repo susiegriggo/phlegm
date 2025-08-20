@@ -1,1 +1,0 @@
-./foldseek/bin/foldseek easy-search $BASEDIR/phrog_$i $BASEDIR/phrog_$i  $OUTDIR/phrog_${i}.tsv tmp_per_${i}  --threads $THREADS  --num-iterations 1 --exhaustive-search --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,alntmscore,lddt,prob

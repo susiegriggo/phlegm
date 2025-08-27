@@ -1,5 +1,5 @@
 # phlegm
-**P**hage **H**omomer **L**ikelihood **E**stimator and **G**enerator **M**ethod 
+**P**hage **H**omomer **L**evel **E**stimator and **G**enerator **M**ethod 
 <p align="center">
   <img src="https://github.com/susiegriggo/phlegm/blob/main/phlegm.png" width="600" title="phlegm logo" alt="phlegm logo">
 </p> 
@@ -7,118 +7,127 @@
 ## How-to
 
 ### Workflow Overview
-The PHLEGM method predicts oligomeric states from protein sequences using AlphaFold structure prediction and ipTM scoring:
+The PHLEGM method predicts oligomeric states from protein sequences using [ColabFold](https://github.com/sokrypton/ColabFold) for AlphaFold structure prediction and ipTM scoring. If you use this method, please also cite ColabFold and AlphaFold Multimer:
 
-1. **Prepare input sequences**
-   ```bash
-   # Split multi-FASTA file into individual FASTA files (one per protein)
-   bash src/split_fasta.sh test_data/test.faa test_data_fasta
-   ```
-
-2. **Generate multiple sequence alignments (MSAs)**
-   ```bash
-   # Use ColabSearch to build MSAs for each sequence
-   mkdir test_data_search
-   cd test_data_search
-   qsub -v DIR=../test_data_fasta ../src/collab_search_dir.sh
-   ```
-
-3. **Generate alignments for different subunit stoichiometries**
-   ```bash
-   # Create MSAs for 2-mer, 3-mer, 4-mer, etc. configurations
-   bash src/generate_alignments.sh test_data_search/ test_data_alignments
-   ```
-
-4. **Run AlphaFold structure prediction**
-   ```bash
-   # Use ColabBatch to predict structures for different subunit counts
-   # Configure for 5 models and 3 recycles per subunit configuration
-   # This generates structures for each protein at different oligomeric states
-   # Output: protein.2_unrelaxed_rank_001.pdb, protein.3_unrelaxed_rank_001.pdb, etc.
-   ```
-
-5. **Extract comprehensive metrics** (optional - for detailed analysis)
-   ```bash
-   python extract_metrics.py -i path/to/alphafold/output -o output_metrics
-   ```
-
-6. **Predict oligomeric state**
-   ```bash
-   # Run prediction on directory containing all AlphaFold outputs
-   python predict_oligomeric_state.py -i path/to/alphafold/output -o predictions.pkl
-   ```
-
-### Output Structure Expected
-After ColabBatch, your output directory should contain files like:
 ```
-protein_name.2_unrelaxed_rank_001.pdb
-protein_name.2_scores_rank_001.json
-protein_name.3_unrelaxed_rank_001.pdb  
-protein_name.3_scores_rank_001.json
-protein_name.4_unrelaxed_rank_001.pdb
-protein_name.4_scores_rank_001.json
-...
+Mirdita M, Schütze K, Moriwaki Y, Heo L, Ovchinnikov S, Steinegger M. ColabFold: Making protein folding accessible to all.
+Nature Methods (2022) doi: 10.1038/s41592-022-01488-1
+
+Evans R, O'Neill M, Pritzel A, et al. Protein complex prediction with AlphaFold-Multimer.
+bioRxiv (2022) doi: 10.1101/2021.10.04.463034
 ```
 
-The `predict_oligomeric_state.py` script will:
-- Auto-detect the protein name prefix
-- Extract ipTM scores from the JSON files
-- Calculate mean ipTM for each subunit count
-- Apply the 0.65 threshold to determine oligomeric state
-- Output binned predictions (Monomer, 2-mer, 3-mer, 4-mer, 5-6-mer, 7+-mer)
+The workflow consists of four main steps:
 
-### Scripts
+1. **Generate MSAs using colabfold_search**
+   ```bash
+   # For a single protein sequence
+   colabfold_search protein.fasta /path/to/database protein_msas
+   ```
 
-#### extract_metrics.py
-**Purpose**: Comprehensive analysis script that extracts detailed metrics from AlphaFold Colab output for in-depth structural analysis and research.
+2. **Generate alignments for different subunit stoichiometries**
+   ```bash
+   # Create MSAs for 2-mer through 10-mer configurations (9 alignments per protein)
+   # Takes a directory of MSAs and generates modified MSAs for multimeric prediction
+   bash src/generate_alignments.sh msas_output/ multimer_alignments
+   ```
+   
+   This step creates 9 different alignment files for each protein, named like:
+   ```
+   protein1_2.a3m  # For 2-mer prediction
+   protein1_3.a3m  # For 3-mer prediction
+   ...
+   protein1_10.a3m # For 10-mer prediction
+   ```
 
-**When to use**: 
-- When you need detailed structural metrics for research/analysis
-- For benchmarking or validating predictions
-- When studying interface quality, contacts, or other structural properties
-- For generating datasets for machine learning or statistical analysis
+3. **Run AlphaFold multimer prediction**
+   ```bash
+   # Create output directory
+   mkdir -p alphafold_output
+   
+   # Run AlphaFold on each multimer configuration separately
+   colabfold_batch --model-type alphafold2_multimer_v3 \
+                   --num-recycle 3 \
+                   --num-models 5 \
+                   --templates false \
+                   --amber false \
+                   multimer_alignments/protein1_2.a3m \
+                   alphafold_output/protein1_2
+   
+   # Repeat for each subunit configuration (3-mer, 4-mer, etc.)
+   colabfold_batch --model-type alphafold2_multimer_v3 \
+                   --num-recycle 3 \
+                   --num-models 5 \
+                   --templates false \
+                   --amber false \
+                   multimer_alignments/protein1_3.a3m \
+                   alphafold_output/protein1_3
+   
+   # For a full directory of alignments (processing each protein and subunit count)
+   for protein in multimer_alignments/*.a3m; do
+     base=$(basename $protein .a3m)
+     
+     # Create a dedicated output directory
+     mkdir -p alphafold_output/$base
+     
+     colabfold_batch --model-type alphafold2_multimer_v3 \
+                     --num-recycle 3 \
+                     --num-models 5 \
+                     --templates false \
+                     --amber false \
+                     $protein \
+                     alphafold_output/$base
+   done
+   
+   # After all predictions are complete, collect all outputs into one directory for analysis
+   mkdir -p alphafold_all_outputs
+   find alphafold_output -name "*.pdb" -o -name "*.json" | xargs -I{} cp {} alphafold_all_outputs/
+   ```
 
-**What it computes**:
-- ipTM, pTM, mean/median pLDDT scores
-- pDockQ2 scores (per chain)
-- Interface contacts at multiple distance thresholds (1-9 Å)
-- Average interface PAE values
-- Maximum PAE values
+   ### Expected Output Structure
+   After running AlphaFold, your combined output directory should contain files like:
+   ```
+   protein_name.2_unrelaxed_rank_001.pdb  # Structure for 2-mer
+   protein_name.2_scores_rank_001.json    # Scores for 2-mer
+   protein_name.3_unrelaxed_rank_001.pdb  # Structure for 3-mer
+   protein_name.3_scores_rank_001.json    # Scores for 3-mer
+   ...
+   protein_name.10_unrelaxed_rank_001.pdb # Structure for 10-mer
+   protein_name.10_scores_rank_001.json   # Scores for 10-mer
+   ```
 
-Usage:
-```bash
-python extract_metrics.py -i /path/to/alphafold/output -o metrics_output
-python extract_metrics.py -i results.tar.gz -o metrics_output -p protein_name
-```
+4. **Analyze results and predict oligomeric state**
 
-#### predict_oligomeric_state.py
-**Purpose**: Fast prediction script that determines oligomeric state using only ipTM scores and the validated threshold approach.
-
-**When to use**:
-- When you just need oligomeric state predictions (most common use case)
-- For high-throughput screening of protein oligomerization
-- When computational resources or time are limited
-- For automated pipelines that need simple yes/no oligomer classifications
-
-**What it computes**:
-- ipTM scores only
-- Mean ipTM per subunit count
-- Oligomeric state prediction with confidence binning
-- Simple classification (Monomer, 2-mer, 3-mer, 4-mer, 5-6-mer, 7+-mer)
-
-Usage:
-```bash
-# Basic usage with auto-detected prefix
-python predict_oligomeric_state.py -i /path/to/alphafold/output
-
-# With tar.gz input and custom output
-python predict_oligomeric_state.py -i results.tar.gz -o predictions.pkl
-
-# With custom prefix and threshold
-python predict_oligomeric_state.py -i /path/to/output -p my_protein -t 0.7 -o results.pkl
-```
-
-**Recommendation**: Use `predict_oligomeric_state.py` for most applications unless you specifically need the additional structural metrics provided by `extract_metrics.py`.
+   You can choose between two analysis approaches depending on your needs:
+   
+   **Option A: Fast prediction with `predict_oligomeric_state.py`**
+   
+   Use this when you need quick oligomeric state predictions:
+   - Extracts ipTM scores only
+   - Applies the validated 0.65 threshold
+   - Provides simple binned classifications (Monomer, 2-mer, 3-mer, 4-mer, 5-6-mer, 7+-mer)
+   - Ideal for high-throughput screening or automated pipelines
+   
+   ```bash
+   # Basic usage (run on the directory with all protein outputs combined)
+   python predict_oligomeric_state.py -i alphafold_all_outputs -o predictions.pkl
+   
+   # With custom threshold
+   python predict_oligomeric_state.py -i alphafold_all_outputs -t 0.7 -o predictions.pkl
+   ```
+   
+   **Option B: Comprehensive analysis with `extract_metrics.py`**
+   
+   Use this for detailed structural analysis:
+   - Extracts ipTM, pTM, pLDDT scores
+   - Calculates pDockQ2 scores per chain
+   - Measures interface contacts at multiple distance thresholds
+   - Computes average interface PAE values
+   - Ideal for research, benchmarking, or generating ML datasets
+   
+   ```bash
+   python extract_metrics.py -i alphafold_all_outputs -o metrics_output
+   ```
 
 ### Dependencies
 

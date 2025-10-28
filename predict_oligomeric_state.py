@@ -3,7 +3,7 @@ Predict oligomeric state from AlphaFold output based on ipTM scores.
 Uses the approach from predict_phrogs.ipynb with ipTM > 0.65 threshold.
 """
 
-import click
+import argparse
 import glob
 import json
 import numpy as np
@@ -177,33 +177,43 @@ def format_output(results, prefix):
         for subunit_count, mean_iptm in sorted(results['per_subunits_mean_iptm'].items()):
             print(f"  {subunit_count}-mer: {mean_iptm:.3f}")
 
-@click.command()
-@click.option('--input', '-i', type=click.Path(exists=True), 
-              help='Path to the input file or directory containing AlphaFold output')
-@click.option('--output', '-o', type=click.Path(), 
-              help='Optional output pickle file to save results')
-@click.option('--prefix', '-p', type=str, 
-              help='Prefix used in colab output (auto-detected if not provided)')
-@click.option('--threshold', '-t', type=float, default=0.65,
-              help='ipTM threshold for confident prediction (default: 0.65)')
-@click.option('--min-structures', '-m', type=int, default=2,
-              help='Minimum number of structures needed for prediction (default: 2)')
-def main(input, output, prefix, threshold, min_structures):
+def main():
     """Predict oligomeric state from AlphaFold output based on ipTM scores."""
+    
+    parser = argparse.ArgumentParser(description='Predict oligomeric state from AlphaFold output based on ipTM scores.')
+    parser.add_argument('-i', '--input', type=str, required=True,
+                        help='Path to the input file or directory containing AlphaFold output')
+    parser.add_argument('-o', '--output', type=str,
+                        help='Optional output pickle file to save results')
+    parser.add_argument('-p', '--prefix', type=str,
+                        help='Prefix used in colab output (auto-detected if not provided)')
+    parser.add_argument('-t', '--threshold', type=float, default=0.65,
+                        help='ipTM threshold for confident prediction (default: 0.65)')
+    parser.add_argument('-m', '--min-structures', type=int, default=2,
+                        help='Minimum number of structures needed for prediction (default: 2)')
+    
+    args = parser.parse_args()
+    
+    # Validate input path exists
+    if not os.path.exists(args.input):
+        print(f"Error: Input path '{args.input}' does not exist.")
+        return
     
     temp_dir = None
     
     try:
         # Handle tar.gz input
-        if input.endswith('.tar.gz'):
-            temp_dir = extract_tar_gz(input)
-            input = temp_dir
+        if args.input.endswith('.tar.gz'):
+            temp_dir = extract_tar_gz(args.input)
+            input_path = temp_dir
+        else:
+            input_path = args.input
         
         # Get files
-        files = glob.glob(os.path.join(input, '*'))
+        files = glob.glob(os.path.join(input_path, '*'))
         
         # Auto-detect or verify prefix
-        if not prefix:
+        if not args.prefix:
             detected_prefix, is_consistent, prefix_counts = detect_prefix(files)
             if not detected_prefix:
                 raise ValueError("Could not auto-detect prefix. Please provide using -p option.")
@@ -216,8 +226,9 @@ def main(input, output, prefix, threshold, min_structures):
             prefix = detected_prefix
         else:
             _, _, prefix_counts = detect_prefix(files)
-            if prefix not in prefix_counts:
-                raise ValueError(f"Provided prefix '{prefix}' does not match any files.")
+            if args.prefix not in prefix_counts:
+                raise ValueError(f"Provided prefix '{args.prefix}' does not match any files.")
+            prefix = args.prefix
         
         print(f"Using prefix: '{prefix}'")
         
@@ -234,18 +245,19 @@ def main(input, output, prefix, threshold, min_structures):
         
         if not iptm_data:
             raise ValueError("No ipTM scores could be extracted from the files.")
+            
         
         # Predict oligomeric state
-        results = predict_oligomeric_state(iptm_data, threshold, min_structures)
+        results = predict_oligomeric_state(iptm_data, args.threshold, args.min_structures)
         
         # Display results
         format_output(results, prefix)
         
         # Save results if requested
-        if output:
-            with open(output, 'wb') as f:
+        if args.output:
+            with open(args.output, 'wb') as f:
                 pickle.dump(results, f)
-            print(f"\nResults saved to {output}")
+            print(f"\nResults saved to {args.output}")
     
     except ValueError as e:
         print(f"Error: {e}")
@@ -258,4 +270,3 @@ def main(input, output, prefix, threshold, min_structures):
 
 if __name__ == '__main__':
     main()
-main()

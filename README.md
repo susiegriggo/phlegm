@@ -1,4 +1,6 @@
+[![DOI](https://zenodo.org/badge/548652990.svg)](https://doi.org/10.5281/zenodo.8128898)
 # phlegm
+
 **P**hage **H**omomer **L**evel **E**stimator and **G**enerator **M**ethod 
 <p align="center">
   <img src="https://github.com/susiegriggo/phlegm/blob/main/phlegm.png" width="600" title="phlegm logo" alt="phlegm logo">
@@ -165,9 +167,10 @@ pip install click numpy pandas biopython matplotlib seaborn scikit-learn umap-le
 
 If you use PHLEGM in your research, please cite this repository:
 
+
 ```
 Grigson, S., Bouras, G., Dutilh, B.E., Edwards, R.A. PHLEGM: Phage Homomer Level Estimator and Generator Method. 
-https://github.com/susiegriggo/phlegm
+https://doi.org/10.5281/zenodo.8128898
 ```
 
 ### Acknowledgments

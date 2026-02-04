@@ -1,7 +1,7 @@
 [![DOI](https://zenodo.org/badge/548652990.svg)](https://doi.org/10.5281/zenodo.8128898)
 # phlegm
 
-**P**hage **H**omomer **L**evel **E**stimator and **G**enerator **M**ethod 
+**P**hage **H**omomer **L**evel **E**stimate and **G**eneration **M**ethod 
 <p align="center">
   <img src="https://github.com/susiegriggo/phlegm/blob/main/phlegm.png" width="600" title="phlegm logo" alt="phlegm logo">
 </p> 

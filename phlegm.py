@@ -7,6 +7,8 @@ Commands
   phlegm fold     Predict 2-mer..10-mer complexes           (GPU; needs only AlphaFold weights)
   phlegm predict  Call oligomeric states from mean ipTM     (anywhere; seconds)
   phlegm run      msa + fold + predict on one machine
+  phlegm download-weights   Fetch the AlphaFold-Multimer weights (~4 GB) ahead of time,
+                            e.g. on an HPC login node when GPU nodes have no internet
 
 All commands share one output directory and skip work that is already done,
 so any command can be re-run to resume.
@@ -198,12 +200,74 @@ def check_gpu(allow_cpu):
         log.warning("Could not check for a GPU (JAX not importable in this Python); continuing")
     elif platform == "cpu":
         msg = ("JAX cannot see a GPU, so AlphaFold would run on the CPU (very slow). "
-               "Run 'phlegm fold' on a GPU node, or reinstall with 'bash install.sh --gpu'.")
+               "Run 'phlegm fold' on a GPU node (on Linux, 'bash install.sh' without --cpu installs GPU JAX).")
         if not allow_cpu:
             raise PhlegmError(msg + " Use --allow-cpu to run anyway.")
         log.warning(msg)
     else:
         log.info("JAX is using: %s", platform)
+
+
+# --------------------------------------------------------------------------- #
+# AlphaFold weights
+# --------------------------------------------------------------------------- #
+
+MODEL_TYPE = "alphafold2_multimer_v3"
+WEIGHTS_URL = "https://storage.googleapis.com/alphafold/alphafold_params_colab_2022-12-06.tar"
+WEIGHTS_MARKER = Path("params") / "download_complexes_multimer_v3_finished.txt"
+
+
+def default_weights_dir():
+    """Where weights live: $PHLEGM_WEIGHTS_DIR, else ColabFold's default cache."""
+    if os.environ.get("PHLEGM_WEIGHTS_DIR"):
+        return Path(os.environ["PHLEGM_WEIGHTS_DIR"])
+    try:
+        from colabfold.download import default_data_dir
+        return Path(default_data_dir)
+    except Exception:
+        if sys.platform == "darwin":
+            return Path.home() / "Library" / "Caches" / "colabfold"
+        return Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "colabfold"
+
+
+def weights_present(weights_dir):
+    return (Path(weights_dir) / WEIGHTS_MARKER).is_file()
+
+
+def download_weights(weights_dir):
+    """Download the AlphaFold-Multimer v3 weights with ColabFold's own downloader."""
+    import urllib.request
+    try:
+        urllib.request.urlopen(urllib.request.Request(WEIGHTS_URL, method="HEAD"), timeout=15)
+    except Exception as e:
+        raise PhlegmError(
+            f"Cannot reach {WEIGHTS_URL} ({e}). This machine seems to have no internet access. "
+            "Run 'phlegm download-weights' on a machine that does (e.g. an HPC login node), "
+            "using the same --weights-dir.")
+    try:
+        from colabfold.download import download_alphafold_params
+    except ImportError:
+        raise PhlegmError("ColabFold is not installed in this environment; see the README.")
+    log.info("Downloading AlphaFold-Multimer v3 weights (~4 GB) to %s", weights_dir)
+    download_alphafold_params(MODEL_TYPE, Path(weights_dir))
+    if not weights_present(weights_dir):
+        raise PhlegmError(f"Weight download to {weights_dir} did not complete")
+    log.info("Weights ready in %s", weights_dir)
+
+
+def ensure_weights(args):
+    """Make sure the weights exist before any GPU work starts."""
+    wdir = Path(args.weights_dir)
+    if weights_present(wdir):
+        log.info("AlphaFold weights: %s", wdir)
+        return
+    if getattr(args, "shard", None):
+        # Parallel shards must not all download into the same directory at once.
+        raise PhlegmError(
+            f"AlphaFold weights not found in {wdir}. Before submitting sharded fold jobs, "
+            "run 'phlegm download-weights' once (with the same --weights-dir, if you set one).")
+    log.info("AlphaFold weights not found in %s; downloading them now (one-off)", wdir)
+    download_weights(wdir)
 
 
 # --------------------------------------------------------------------------- #
@@ -300,6 +364,7 @@ def step_fold(proteins, args, outdir):
     require("colabfold_batch")
     if not args.dry_run:
         check_gpu(args.allow_cpu)
+        ensure_weights(args)
 
     log.info("Fold: %d-mer to %d-mer with AlphaFold-Multimer v3", args.min_oligomer, args.max_oligomer)
     failed = []
@@ -315,7 +380,8 @@ def step_fold(proteins, args, outdir):
         cmd = ["colabfold_batch", pdir, outdir / "structures" / p["id"],
                "--model-type", "alphafold2_multimer_v3",
                "--num-models", args.num_models,
-               "--num-recycle", args.num_recycle]
+               "--num-recycle", args.num_recycle,
+               "--data", args.weights_dir]
         cmd += shlex.split(args.colabfold_args or "")
         try:
             run_cmd(cmd, args.dry_run)
@@ -414,6 +480,15 @@ def cmd_predict(args, outdir):
     return 0 if step_predict(load_registry(outdir), args, outdir) else 2
 
 
+def cmd_download_weights(args, outdir=None):
+    wdir = Path(args.weights_dir)
+    if weights_present(wdir):
+        log.info("AlphaFold weights already present in %s", wdir)
+        return 0
+    download_weights(wdir)
+    return 0
+
+
 def cmd_run(args, outdir):
     proteins = load_fasta_proteins(args.input)
     save_registry(proteins, outdir)
@@ -469,6 +544,11 @@ def build_parser():
     g.add_argument("--allow-cpu", action="store_true",
                    help="Run even if JAX cannot see a GPU (very slow)")
 
+    weights = argparse.ArgumentParser(add_help=False)
+    weights.add_argument("--weights-dir", default=str(default_weights_dir()),
+                         help="AlphaFold weights directory (shared with ColabFold's cache; "
+                              "can also be set with $PHLEGM_WEIGHTS_DIR)")
+
     pred = argparse.ArgumentParser(add_help=False)
     g = pred.add_argument_group("Predict options")
     g.add_argument("-t", "--threshold", type=float, default=0.65,
@@ -487,7 +567,7 @@ def build_parser():
                    help="Build one MSA per protein (CPU)",
                    description="Build one MSA per protein, with a local ColabFold database (--db) "
                                "or the public ColabFold MMseqs2 server.")
-    p = sub.add_parser("fold", parents=[common, stoich, fold, dry], formatter_class=fmt,
+    p = sub.add_parser("fold", parents=[common, stoich, fold, weights, dry], formatter_class=fmt,
                        help="Predict complexes for each stoichiometry (GPU)",
                        description="Reuse each protein's MSA to predict 2-mer..10-mer complexes "
                                    "with AlphaFold-Multimer. Needs only the AlphaFold weights.")
@@ -497,9 +577,14 @@ def build_parser():
                    help="Call oligomeric states from ipTM scores",
                    description="Call each protein's oligomeric state from the mean ipTM of each "
                                "stoichiometry and write phlegm_predictions.tsv.")
-    sub.add_parser("run", parents=[inp, common, msa, stoich, fold, pred, dry], formatter_class=fmt,
+    sub.add_parser("run", parents=[inp, common, msa, stoich, fold, weights, pred, dry], formatter_class=fmt,
                    help="Run msa, fold and predict on one machine",
                    description="Run the whole pipeline (msa, fold, predict) on one machine.")
+    sub.add_parser("download-weights", parents=[weights], formatter_class=fmt,
+                   help="Download the AlphaFold-Multimer weights (~4 GB)",
+                   description="Download the AlphaFold-Multimer v3 weights. 'phlegm fold' does this "
+                               "automatically when needed, but on HPC run it once on a login node, "
+                               "because GPU nodes often have no internet access.")
     return ap
 
 
@@ -533,6 +618,18 @@ def setup_logging(outdir, args):
 
 def main(argv=None):
     args = parse_args(argv)
+    if args.command == "download-weights":
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s",
+                                               "%Y-%m-%d %H:%M:%S"))
+        log.setLevel(logging.INFO)
+        log.addHandler(handler)
+        try:
+            return cmd_download_weights(args)
+        except (PhlegmError, OSError) as e:
+            log.error("%s", e)
+            return 1
+
     outdir = Path(args.outdir).resolve()
     if args.command in ("fold", "predict") and not outdir.is_dir():
         sys.exit(f"Error: output directory {outdir} not found. Run 'phlegm msa' first.")

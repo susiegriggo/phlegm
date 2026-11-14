@@ -8,27 +8,27 @@
 
 ## Quick start
 
-### 1. Install (one command)
+### 1. Install
 
 Requires [conda/mamba](https://github.com/conda-forge/miniforge).
 
 ```bash
 git clone https://github.com/susiegriggo/phlegm.git
 cd phlegm
-bash install.sh
+mamba env create -f environment.yml    # use -n NAME or -p /path to choose where it goes
 conda activate phlegm
+bash install.sh
 ```
 
-`install.sh` creates a `phlegm` conda environment with ColabFold v1.5.5, MMseqs2 15.6f452 and all Python dependencies (the versions used in the manuscript), and installs the `phlegm` command. It then downloads the AlphaFold-Multimer v3 weights. It does not download the ColabFold sequence databases (see [Using a local database](#using-a-local-colabfold-database)).
+Use `mamba` (included with [Miniforge](https://github.com/conda-forge/miniforge)) rather than `conda` to create the environment. Older conda versions (before 23.10) use a slow solver that can take 30+ minutes on this environment, while mamba takes a few minutes. With conda ≥ 23.10, `conda env create -f environment.yml` is equally fast.
 
-GPU support: if an NVIDIA GPU is visible during installation, GPU-enabled JAX is installed too (CUDA 12 via pip; needs NVIDIA driver ≥ 525). **On an HPC cluster, install from the login node with `bash install.sh --gpu`**, because login nodes usually can't see the GPUs. The same environment then works on both CPU and GPU nodes.
+`environment.yml` contains ColabFold v1.5.5, MMseqs2 15.6f452 and all Python dependencies (the versions used in the manuscript). You can create the environment however you like, or add these dependencies to an existing environment with `mamba env update -f environment.yml`.
 
-| installer option | purpose |
-|---|---|
-| `-n NAME` | environment name (default `phlegm`) |
-| `--gpu` | always install GPU JAX (e.g. on an HPC login node) |
-| `--cpu` | never install GPU JAX |
-| `--no-weights` | skip downloading the AlphaFold weights |
+`install.sh` then sets up PHLEGM inside whichever conda environment is active. It installs the `phlegm` command and, on Linux, GPU-enabled JAX (CUDA 12 via pip; needs NVIDIA driver ≥ 525 to use a GPU). GPU JAX falls back to the CPU when there's no GPU, so on a cluster you can install from the login node and use the same environment on CPU and GPU nodes. Use `bash install.sh --cpu` to skip it (saves ~3 GB if you'll never run `fold`). On macOS, JAX is CPU-only.
+
+Nothing large is downloaded at install time:
+- **AlphaFold-Multimer weights (~4 GB)** are downloaded automatically the first time you run `phlegm fold` (or `phlegm run`). On HPC, GPU nodes often have no internet access, so run `phlegm download-weights` once on the login node. The job scripts in `examples/` do this for you. Weights are stored in ColabFold's cache (`~/.cache/colabfold` on Linux); use `--weights-dir` or `$PHLEGM_WEIGHTS_DIR` to keep one shared copy elsewhere, e.g. for a whole lab.
+- **ColabFold sequence databases** are not downloaded at all (see [Using a local database](#using-a-local-colabfold-database)).
 
 ### 2. Run the whole pipeline from a FASTA file
 
@@ -59,7 +59,10 @@ The pipeline has three steps with different hardware needs, and each is its own 
 | `phlegm fold -o out [--shard I/N]` | predicts every stoichiometry with AlphaFold-Multimer | GPU node | AlphaFold weights only |
 | `phlegm predict -o out` | calls oligomeric states, writes the TSV | anywhere | — |
 
-`phlegm run` simply runs all three. All commands share the output directory, and any command can be re-run to resume. `fold` never builds MSAs itself: if an MSA is missing it stops and tells you to run `phlegm msa`. It also stops if JAX can't see a GPU, rather than running AlphaFold on the CPU for days (override with `--allow-cpu`).
+`phlegm run` simply runs all three. All commands share the output directory, and any command can be re-run to resume. Before starting, `fold` checks three things and stops with a clear message if any fails:
+- every MSA exists (it never builds MSAs itself, so it won't quietly fall back to the public server);
+- JAX can see a GPU, rather than running AlphaFold on the CPU for days (override with `--allow-cpu`);
+- the AlphaFold weights are present. Without `--shard`, it downloads them if they're missing. With `--shard`, it never downloads, so parallel jobs can't all download into the same folder at once; run `phlegm download-weights` first.
 
 `--shard I/N` makes `fold` process only shard `I` of `N`, so the proteins can be split across a GPU job array. Ready-made submission scripts chain the three steps with job dependencies:
 
@@ -90,6 +93,7 @@ For more than a few dozen proteins, use a local database instead of the public s
 | `--num-models` / `--num-recycle` | fold, run | AlphaFold-Multimer settings (default 5 models, 3 recycles, as in the manuscript) |
 | `--colabfold-args "..."` | fold, run | extra arguments for `colabfold_batch` |
 | `--shard I/N` | fold | process one shard of the proteins (job arrays) |
+| `--weights-dir DIR` | fold, run, download-weights | AlphaFold weights location (default: ColabFold's cache, or `$PHLEGM_WEIGHTS_DIR`) |
 | `--keep-going` | fold, run | continue with other proteins if one fails |
 | `-t/--threshold` | predict, run | mean ipTM threshold for calling a multimer (default 0.65) |
 | `--extended-metrics` | predict, run | also compute pDockQ2, interface contacts and PAE with `extract_metrics.py` |

@@ -30,6 +30,22 @@ Nothing large is downloaded at install time:
 - **AlphaFold-Multimer weights (~4 GB)** are downloaded automatically the first time you run `phlegm fold` (or `phlegm run`). On HPC, GPU nodes often have no internet access, so run `phlegm download-weights` once on the login node. The job scripts in `examples/` do this for you. Weights are stored in ColabFold's cache (`~/.cache/colabfold` on Linux); use `--weights-dir` or `$PHLEGM_WEIGHTS_DIR` to keep one shared copy elsewhere, e.g. for a whole lab.
 - **ColabFold sequence databases** are not downloaded at all (see [Using a local database](#using-a-local-colabfold-database)).
 
+### Test your installation
+
+`test_data/phrog_807.faa` contains one protein: PHROG 807, a major tail protein, which the manuscript uses as a worked example. Its closest PDB homolog (8rk8) is a hexamer.
+
+```bash
+phlegm run -i test_data/phrog_807.faa -o phlegm_test
+```
+
+This models 2- to 10-mers with 5 models each (the 10-mer is ~2,600 residues), so expect it to take a few hours and to need a GPU with plenty of memory (≥ 40 GB is safest for the largest assemblies). It uses the public ColabFold server for the MSA, so it needs internet access. `phlegm_test/phlegm_predictions.tsv` should report `predicted_subunits` = 6 (`predicted_state` = `5-6-mer`), with a max mean ipTM of around 0.75.
+
+For a quicker check that everything runs (not a full prediction), limit the stoichiometries and models:
+
+```bash
+phlegm run -i test_data/phrog_807.faa -o phlegm_test --max-oligomer 6 --num-models 2
+```
+
 ### 2. Run the whole pipeline from a FASTA file
 
 ```bash

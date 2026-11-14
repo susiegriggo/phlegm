@@ -1,3 +1,6 @@
 __pycache__/
 *.egg-info/
 build/
+
+# output of the README installation test
+/phlegm_test/

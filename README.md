@@ -6,7 +6,68 @@
   <img src="https://github.com/susiegriggo/phlegm/blob/main/phlegm.png" width="600" title="phlegm logo" alt="phlegm logo">
 </p> 
 
-## How-to
+## Quick start
+
+### 1. Install (one command)
+
+Requires [conda/mamba](https://github.com/conda-forge/miniforge).
+
+```bash
+git clone https://github.com/susiegriggo/phlegm.git
+cd phlegm
+bash install.sh
+conda activate phlegm
+```
+
+`install.sh` creates a `phlegm` conda environment with ColabFold v1.5.5, MMseqs2 15.6f452 and all Python dependencies (the versions used in the manuscript). If it finds an NVIDIA GPU, it also installs GPU-enabled JAX (CUDA 12 via pip, which needs NVIDIA driver ≥ 525). It then downloads the AlphaFold-Multimer v3 weights. Options: `-n <env name>`, `--cpu`, `--no-weights`. To create the environment without the extras: `conda env create -f environment.yml`.
+
+### 2. Run the whole pipeline from a FASTA file
+
+```bash
+python phlegm.py -i proteins.fasta -o phlegm_out
+```
+
+This runs every step below automatically for every sequence in the FASTA file. It builds one MSA per protein and reuses it for each stoichiometry, predicts the 2-mer to 10-mer complexes with AlphaFold-Multimer, and calls the oligomeric state from the mean ipTM. Results are written to `phlegm_out/phlegm_predictions.tsv`:
+
+| column | description |
+|---|---|
+| `protein_id` | first word of the FASTA header (file-name safe) |
+| `predicted_subunits` / `predicted_state` | predicted number of subunits and binned state (Monomer, 2-mer, 3-mer, 4-mer, 5-6-mer, 7+-mer) |
+| `max_mean_iptm` | highest mean ipTM across stoichiometries |
+| `top_multimer_subunits` | stoichiometry with the highest mean ipTM (before applying the threshold) |
+| `mean_iptm_<n>mer` | mean ipTM across models for each stoichiometry |
+| `status` | `ok`, `incomplete`, or the reason a protein failed |
+
+Useful options (`python phlegm.py --help` lists all):
+
+| option | purpose |
+|---|---|
+| `--db /path/to/colabfold_db` | build MSAs with `colabfold_search` against a local ColabFold database instead of the public MMseqs2 server (recommended for large datasets) |
+| `--msa-dir DIR` | use precomputed monomer MSAs named `<id>.a3m` |
+| `--min-oligomer` / `--max-oligomer` | range of stoichiometries to model (default 2–10) |
+| `-t/--threshold` | mean ipTM threshold for calling a multimer (default 0.65) |
+| `--colabfold-args "..."` | pass extra arguments to `colabfold_batch` |
+| `--extended-metrics` | also compute pDockQ2, interface contacts and PAE with `extract_metrics.py` |
+| `--stop-after msa` | stop after one step, e.g. build MSAs on a CPU node and continue on a GPU node |
+| `--keep-going` | keep going with the remaining proteins if one fails |
+| `--dry-run` | print the commands without running them |
+
+Runs can be resumed: re-running the same command skips finished MSAs and structures.
+
+Output layout:
+```
+phlegm_out/
+├── phlegm_predictions.tsv     # one row per protein
+├── phlegm_predictions.pkl     # full per-protein results (all ipTM scores)
+├── phlegm.log
+├── msas/<id>.a3m              # monomer MSA (generated once per protein)
+├── oligomer_msas/<id>/<id>.<n>.a3m
+└── structures/<id>/           # colabfold_batch outputs for every stoichiometry
+```
+
+## How-to (individual steps)
+
+The steps below are what `phlegm.py` runs. They are documented for users who want to run or customize each step by hand, for example as separate jobs on an HPC scheduler.
 
 ### Workflow Overview
 The PHLEGM method predicts oligomeric states from protein sequences using [ColabFold](https://github.com/sokrypton/ColabFold) for AlphaFold structure prediction and ipTM scoring. If you use this method, please also cite ColabFold and AlphaFold Multimer:
@@ -34,12 +95,12 @@ The workflow consists of four main steps:
    bash src/generate_alignments.sh msas_output/ multimer_alignments
    ```
    
-   This step creates 9 different alignment files for each protein, named like:
+   This step creates one alignment file per stoichiometry for each protein, named like:
    ```
-   protein1_2.a3m  # For 2-mer prediction
-   protein1_3.a3m  # For 3-mer prediction
+   protein1.2.a3m  # For 2-mer prediction
+   protein1.3.a3m  # For 3-mer prediction
    ...
-   protein1_10.a3m # For 10-mer prediction
+   protein1.10.a3m # For 10-mer prediction
    ```
 
 3. **Run AlphaFold multimer prediction**
@@ -51,19 +112,15 @@ The workflow consists of four main steps:
    colabfold_batch --model-type alphafold2_multimer_v3 \
                    --num-recycle 3 \
                    --num-models 5 \
-                   --templates false \
-                   --amber false \
-                   multimer_alignments/protein1_2.a3m \
-                   alphafold_output/protein1_2
+                   multimer_alignments/protein1.2.a3m \
+                   alphafold_output/protein1.2
    
    # Repeat for each subunit configuration (3-mer, 4-mer, etc.)
    colabfold_batch --model-type alphafold2_multimer_v3 \
                    --num-recycle 3 \
                    --num-models 5 \
-                   --templates false \
-                   --amber false \
-                   multimer_alignments/protein1_3.a3m \
-                   alphafold_output/protein1_3
+                   multimer_alignments/protein1.3.a3m \
+                   alphafold_output/protein1.3
    
    # For a full directory of alignments (processing each protein and subunit count)
    for protein in multimer_alignments/*.a3m; do
@@ -75,8 +132,6 @@ The workflow consists of four main steps:
      colabfold_batch --model-type alphafold2_multimer_v3 \
                      --num-recycle 3 \
                      --num-models 5 \
-                     --templates false \
-                     --amber false \
                      $protein \
                      alphafold_output/$base
    done
@@ -133,7 +188,7 @@ The workflow consists of four main steps:
 
 ### Dependencies
 
-The scripts require the following Python packages:
+All dependencies for the pipeline are installed by `bash install.sh` (see [Quick start](#quick-start)). The scripts require the following Python packages:
 
 #### For extract_metrics.py:
 - `click` - Command line interface

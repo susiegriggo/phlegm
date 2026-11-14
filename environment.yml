@@ -1,0 +1,24 @@
+# Conda environment for PHLEGM.
+#
+# Recommended: run `bash install.sh`, which creates this environment, adds
+# GPU-enabled JAX when an NVIDIA GPU is detected and downloads the
+# AlphaFold-Multimer weights.
+#
+# Manual alternative:
+#   conda env create -f environment.yml
+#
+# Versions match those used in the PHLEGM manuscript
+# (ColabFold v1.5.5, MMseqs2 15.6f452).
+name: phlegm
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - python=3.10
+  - colabfold=1.5.5
+  - mmseqs2=15.6f452
+  - numpy
+  - pandas
+  - biopython
+  - click

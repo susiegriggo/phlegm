@@ -19,15 +19,26 @@ bash install.sh
 conda activate phlegm
 ```
 
-`install.sh` creates a `phlegm` conda environment with ColabFold v1.5.5, MMseqs2 15.6f452 and all Python dependencies (the versions used in the manuscript). If it finds an NVIDIA GPU, it also installs GPU-enabled JAX (CUDA 12 via pip, which needs NVIDIA driver ≥ 525). It then downloads the AlphaFold-Multimer v3 weights. Options: `-n <env name>`, `--cpu`, `--no-weights`. To create the environment without the extras: `conda env create -f environment.yml`.
+`install.sh` creates a `phlegm` conda environment with ColabFold v1.5.5, MMseqs2 15.6f452 and all Python dependencies (the versions used in the manuscript), and installs the `phlegm` command. It then downloads the AlphaFold-Multimer v3 weights. It does not download the ColabFold sequence databases (see [Using a local database](#using-a-local-colabfold-database)).
+
+GPU support: if an NVIDIA GPU is visible during installation, GPU-enabled JAX is installed too (CUDA 12 via pip; needs NVIDIA driver ≥ 525). **On an HPC cluster, install from the login node with `bash install.sh --gpu`**, because login nodes usually can't see the GPUs. The same environment then works on both CPU and GPU nodes.
+
+| installer option | purpose |
+|---|---|
+| `-n NAME` | environment name (default `phlegm`) |
+| `--gpu` | always install GPU JAX (e.g. on an HPC login node) |
+| `--cpu` | never install GPU JAX |
+| `--no-weights` | skip downloading the AlphaFold weights |
 
 ### 2. Run the whole pipeline from a FASTA file
 
 ```bash
-python phlegm.py -i proteins.fasta -o phlegm_out
+phlegm run -i proteins.fasta -o phlegm_out
 ```
 
-This runs every step below automatically for every sequence in the FASTA file. It builds one MSA per protein and reuses it for each stoichiometry, predicts the 2-mer to 10-mer complexes with AlphaFold-Multimer, and calls the oligomeric state from the mean ipTM. Results are written to `phlegm_out/phlegm_predictions.tsv`:
+This runs the whole pipeline for every sequence in the FASTA file. It builds one MSA per protein and reuses it for each stoichiometry, predicts the 2-mer to 10-mer complexes with AlphaFold-Multimer, and calls the oligomeric state from the mean ipTM. By default MSAs come from the public ColabFold MMseqs2 server, so no database is needed. This suits a few to tens of proteins on a single GPU machine.
+
+Results are written to `phlegm_out/phlegm_predictions.tsv`:
 
 | column | description |
 |---|---|
@@ -36,30 +47,61 @@ This runs every step below automatically for every sequence in the FASTA file. I
 | `max_mean_iptm` | highest mean ipTM across stoichiometries |
 | `top_multimer_subunits` | stoichiometry with the highest mean ipTM (before applying the threshold) |
 | `mean_iptm_<n>mer` | mean ipTM across models for each stoichiometry |
-| `status` | `ok`, `incomplete`, or the reason a protein failed |
+| `status` | `ok`, `incomplete`, `not folded`, or the reason a protein failed |
 
-Useful options (`python phlegm.py --help` lists all):
+### 3. Running the steps separately (HPC)
 
-| option | purpose |
-|---|---|
-| `--db /path/to/colabfold_db` | build MSAs with `colabfold_search` against a local ColabFold database instead of the public MMseqs2 server (recommended for large datasets) |
-| `--msa-dir DIR` | use precomputed monomer MSAs named `<id>.a3m` |
-| `--min-oligomer` / `--max-oligomer` | range of stoichiometries to model (default 2–10) |
-| `-t/--threshold` | mean ipTM threshold for calling a multimer (default 0.65) |
-| `--colabfold-args "..."` | pass extra arguments to `colabfold_batch` |
-| `--extended-metrics` | also compute pDockQ2, interface contacts and PAE with `extract_metrics.py` |
-| `--stop-after msa` | stop after one step, e.g. build MSAs on a CPU node and continue on a GPU node |
-| `--keep-going` | keep going with the remaining proteins if one fails |
-| `--dry-run` | print the commands without running them |
+The pipeline has three steps with different hardware needs, and each is its own command:
 
-Runs can be resumed: re-running the same command skips finished MSAs and structures.
+| command | what it does | runs on | needs |
+|---|---|---|---|
+| `phlegm msa -i proteins.fasta -o out [--db DB]` | one MSA per protein | CPU node (high memory with `--db`) | ColabFold database, or internet for the server |
+| `phlegm fold -o out [--shard I/N]` | predicts every stoichiometry with AlphaFold-Multimer | GPU node | AlphaFold weights only |
+| `phlegm predict -o out` | calls oligomeric states, writes the TSV | anywhere | — |
+
+`phlegm run` simply runs all three. All commands share the output directory, and any command can be re-run to resume. `fold` never builds MSAs itself: if an MSA is missing it stops and tells you to run `phlegm msa`. It also stops if JAX can't see a GPU, rather than running AlphaFold on the CPU for days (override with `--allow-cpu`).
+
+`--shard I/N` makes `fold` process only shard `I` of `N`, so the proteins can be split across a GPU job array. Ready-made submission scripts chain the three steps with job dependencies:
+
+```bash
+# SLURM: MSA job -> GPU job array (20 shards) -> predict job
+bash examples/submit_slurm.sh proteins.fasta phlegm_out /path/to/colabfold_db 20
+
+# PBS Pro (e.g. NCI Gadi, which has no job arrays): MSA job -> 20 GPU jobs -> predict job
+bash examples/submit_pbs.sh proteins.fasta phlegm_out /path/to/colabfold_db 20
+```
+
+Edit the resource settings at the top of each script (account/project, queues, memory, walltime) for your cluster.
+
+### Using a local ColabFold database
+
+For more than a few dozen proteins, use a local database instead of the public server. PHLEGM does not install it: it is large (~1–2 TB with indices) and is often shared on clusters already. To build one, follow ColabFold's [`setup_databases.sh`](https://github.com/sokrypton/ColabFold/blob/v1.5.5/setup_databases.sh). Then pass `--db /path/to/colabfold_db` to `phlegm msa` or `phlegm run`.
+
+### Options
+
+`phlegm <command> --help` lists every option for a command. The main ones:
+
+| option | command(s) | purpose |
+|---|---|---|
+| `--db DIR` | msa, run | local ColabFold database for `colabfold_search` |
+| `--msa-dir DIR` | msa, run | use precomputed monomer MSAs named `<id>.a3m` |
+| `--threads N` | msa, run | threads for `colabfold_search` |
+| `--min-oligomer` / `--max-oligomer` | fold, predict, run | stoichiometries to model (default 2–10) |
+| `--num-models` / `--num-recycle` | fold, run | AlphaFold-Multimer settings (default 5 models, 3 recycles, as in the manuscript) |
+| `--colabfold-args "..."` | fold, run | extra arguments for `colabfold_batch` |
+| `--shard I/N` | fold | process one shard of the proteins (job arrays) |
+| `--keep-going` | fold, run | continue with other proteins if one fails |
+| `-t/--threshold` | predict, run | mean ipTM threshold for calling a multimer (default 0.65) |
+| `--extended-metrics` | predict, run | also compute pDockQ2, interface contacts and PAE with `extract_metrics.py` |
+| `--dry-run` | msa, fold, run | print commands without running them |
 
 Output layout:
 ```
 phlegm_out/
 ├── phlegm_predictions.tsv     # one row per protein
 ├── phlegm_predictions.pkl     # full per-protein results (all ipTM scores)
-├── phlegm.log
+├── input/                     # validated sequences used by every step
+├── logs/                      # one log per command (and per fold shard)
 ├── msas/<id>.a3m              # monomer MSA (generated once per protein)
 ├── oligomer_msas/<id>/<id>.<n>.a3m
 └── structures/<id>/           # colabfold_batch outputs for every stoichiometry
@@ -67,7 +109,7 @@ phlegm_out/
 
 ## How-to (individual steps)
 
-The steps below are what `phlegm.py` runs. They are documented for users who want to run or customize each step by hand, for example as separate jobs on an HPC scheduler.
+The steps below are what the `phlegm` command runs. They are documented for users who want to run or customize each step by hand, for example as separate jobs on an HPC scheduler.
 
 ### Workflow Overview
 The PHLEGM method predicts oligomeric states from protein sequences using [ColabFold](https://github.com/sokrypton/ColabFold) for AlphaFold structure prediction and ipTM scoring. If you use this method, please also cite ColabFold and AlphaFold Multimer:

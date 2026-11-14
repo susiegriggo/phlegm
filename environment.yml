@@ -16,6 +16,8 @@ channels:
   - nodefaults
 dependencies:
   - python=3.10
+  - pip
+  - setuptools>=61
   - colabfold=1.5.5
   - mmseqs2=15.6f452
   - numpy

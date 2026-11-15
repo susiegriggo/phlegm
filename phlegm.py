@@ -140,7 +140,9 @@ def run_cmd(cmd, dry_run=False):
     log.info("Running: %s", " ".join(shlex.quote(str(c)) for c in cmd))
     if dry_run:
         return
-    result = subprocess.run([str(c) for c in cmd])
+    # Unbuffered, so ColabFold's progress shows up in SLURM/PBS logs as it happens.
+    env = {**os.environ, "PYTHONUNBUFFERED": "1"}
+    result = subprocess.run([str(c) for c in cmd], env=env)
     if result.returncode != 0:
         raise PhlegmError(f"Command failed with exit code {result.returncode}: {cmd[0]}")
 

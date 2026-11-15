@@ -2,6 +2,8 @@
 # phlegm
 
 **P**hage **H**omomer **L**evel **E**stimate and **G**eneration **M**ethod 
+
+📄 Preprint: [Computational prediction resolves thousands of homooligomeric phage protein structures](https://doi.org/10.64898/2026.05.24.727406) (bioRxiv, 2026)
 <p align="center">
   <img src="https://github.com/susiegriggo/phlegm/blob/main/phlegm.png" width="600" title="phlegm logo" alt="phlegm logo">
 </p> 
@@ -38,7 +40,7 @@ Nothing large is downloaded at install time:
 phlegm run -i test_data/phrog_807.faa -o phlegm_test
 ```
 
-This models 2- to 10-mers with 5 models each (the 10-mer is ~2,600 residues), so expect it to take a few hours and to need a GPU with plenty of memory (≥ 40 GB is safest for the largest assemblies). It uses the public ColabFold server for the MSA, so it needs internet access. `phlegm_test/phlegm_predictions.tsv` should report `predicted_subunits` = 6 (`predicted_state` = `5-6-mer`), with a max mean ipTM of around 0.75.
+This models 2- to 10-mers with 5 models each (the 10-mer is ~2,600 residues), so expect it to take roughly 6–12 hours on a single A40/A100 (mostly the 8- to 10-mers) and to need a GPU with plenty of memory (≥ 40 GB is safest for the largest assemblies). It uses the public ColabFold server for the MSA, so it needs internet access. `phlegm_test/phlegm_predictions.tsv` should report `predicted_subunits` = 6 (`predicted_state` = `5-6-mer`), with a max mean ipTM of around 0.75.
 
 For a quicker check that everything runs (not a full prediction), limit the stoichiometries and models:
 
@@ -282,12 +284,13 @@ pip install click numpy pandas biopython matplotlib seaborn scikit-learn umap-le
 
 ## Citation
 
-If you use PHLEGM in your research, please cite this repository:
-
+If you use PHLEGM in your research, please cite:
 
 ```
-Grigson, S., Bouras, G., Dutilh, B.E., Edwards, R.A. PHLEGM: Phage Homomer Level Estimator and Generator Method. 
-https://doi.org/10.5281/zenodo.8128898
+Grigson, S.R., Geliashvili, N., Schubert, T., Bouras, G., Mallawaarachchi, V., Bogacz, M.,
+Hellmich, U.A., Edwards, R.A., Dutilh, B.E. (2026) Computational prediction resolves
+thousands of homooligomeric phage protein structures. bioRxiv.
+https://doi.org/10.64898/2026.05.24.727406
 ```
 
 ### Acknowledgments

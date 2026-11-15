@@ -62,9 +62,10 @@ if [[ "$(uname -s)" == "Linux" && "$GPU_JAX" -eq 1 ]]; then
     echo "==> Installing CUDA-enabled JAX"
     # The bioconda colabfold package cannot be solved together with conda's
     # CUDA jaxlib builds, so (as LocalColabFold does) install CUDA JAX from pip.
-    # cuDNN is pinned to 8.9 to match the jaxlib 0.4.25 cudnn89 build.
+    # cuDNN is pinned to 8.9 to match the jaxlib 0.4.25 cudnn89 build;
+    # ml-dtypes < 0.5 is required by the TensorFlow that AlphaFold imports.
     "$PY" -m pip install --upgrade \
-        "jax[cuda12_pip]==0.4.25" "numpy<2" "nvidia-cudnn-cu12>=8.9,<9" \
+        "jax[cuda12_pip]==0.4.25" "numpy<2" "ml-dtypes<0.5" "nvidia-cudnn-cu12>=8.9,<9" \
         -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
     if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
         "$PY" -c "import jax; d = jax.devices(); print('JAX devices:', d); assert d[0].platform == 'gpu', 'JAX cannot see the GPU'"
@@ -78,11 +79,12 @@ fi
 
 echo "==> Checking installation"
 colabfold_batch --help >/dev/null
-# Import ColabFold's model code: catches JAX/haiku version mismatches now
-# rather than at the first 'phlegm msa' or 'phlegm fold'.
-"$PY" -c "import colabfold.alphafold.models" 2>/dev/null || {
+# Import ColabFold's and AlphaFold's model code (JAX, haiku, flax, TensorFlow):
+# catches version mismatches now rather than at the first 'phlegm msa' or 'fold'.
+CHECK="import tensorflow, colabfold.alphafold.models; from alphafold.model import model"
+"$PY" -c "$CHECK" 2>/dev/null || {
     echo "Error: ColabFold's model code failed to import. Details:" >&2
-    "$PY" -c "import colabfold.alphafold.models" >&2 || true
+    "$PY" -c "$CHECK" >&2 || true
     echo "Try: conda env update -f $SCRIPT_DIR/environment.yml   (pins compatible versions)" >&2
     exit 1
 }

@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "phlegm"
+version = "1.1.0"
+description = "Phage Homomer Level Estimate and Generation Method: predict homo-oligomeric states with AlphaFold-Multimer"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+# Runtime dependencies (ColabFold, MMseqs2, numpy, ...) are installed by
+# conda from environment.yml; see install.sh.
+dependencies = []
+
+[project.scripts]
+phlegm = "phlegm:main"
+
+[project.urls]
+Homepage = "https://github.com/susiegriggo/phlegm"
+
+[tool.setuptools]
+py-modules = ["phlegm", "predict_oligomeric_state"]
+packages = []

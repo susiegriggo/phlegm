@@ -51,7 +51,7 @@ def determine_subunit_info(files, prefix):
     
     for file in files:
         basename = os.path.basename(file)
-        pattern = rf"{re.escape(prefix)}\.(\d+)_(?:unrelaxed|scores)_rank_00(\d+)"
+        pattern = rf"^{re.escape(prefix)}\.(\d+)_(?:unrelaxed|scores)_rank_00(\d+)"
         match = re.search(pattern, basename)
         
         if match:
@@ -88,7 +88,8 @@ def extract_iptm_scores(files, prefix, max_subunits, num_structures_dict):
             s_j = prefix + '.' + str(s) + '_scores_rank_00' + str(i)
             
             # Find JSON file
-            json_files = [f for f in files if s_j in f and 'json' in f]
+            json_files = [f for f in files
+                          if os.path.basename(f).startswith(s_j) and f.endswith('.json')]
             if not json_files:
                 continue
                 
@@ -135,7 +136,9 @@ def predict_oligomeric_state(iptm_data, threshold=0.65, min_structures=2):
         'predicted_state_bin': None,
         'max_iptm': 0,
         'max_iptm_subunits': 1,
-        'all_scores': iptm_data
+        'top_multimer_subunits': None,
+        'all_scores': iptm_data,
+        'per_subunits_mean_iptm': {},
     }
     
     # Calculate mean ipTM for each subunit count (like in notebook)
@@ -152,6 +155,7 @@ def predict_oligomeric_state(iptm_data, threshold=0.65, min_structures=2):
     # Find the maximum mean ipTM and corresponding subunit count
     max_iptm = max(per_subunits_iptm.values())
     max_iptm_subunits = max(per_subunits_iptm.keys(), key=per_subunits_iptm.get)
+    results['top_multimer_subunits'] = max_iptm_subunits
     
     # Apply threshold logic from notebook
     if max_iptm < threshold:
@@ -164,6 +168,39 @@ def predict_oligomeric_state(iptm_data, threshold=0.65, min_structures=2):
     results['per_subunits_mean_iptm'] = per_subunits_iptm
     
     return results
+
+def predict_from_directory(input_path, prefix=None, threshold=0.65, min_structures=2):
+    """
+    Run the full prediction on a directory of ColabFold outputs for one protein.
+
+    Returns:
+        (prefix, results) tuple. Raises ValueError if no usable outputs are found.
+    """
+    files = glob.glob(os.path.join(input_path, '*'))
+
+    if not prefix:
+        detected_prefix, is_consistent, prefix_counts = detect_prefix(files)
+        if not detected_prefix:
+            raise ValueError("Could not auto-detect prefix. Please provide using -p option.")
+        if not is_consistent:
+            prefixes_info = ', '.join([f"'{p}' ({c} files)" for p, c in prefix_counts.items()])
+            print(f"Warning: Multiple prefixes detected: {prefixes_info}")
+            print(f"Using most common prefix: '{detected_prefix}'")
+        prefix = detected_prefix
+    else:
+        _, _, prefix_counts = detect_prefix(files)
+        if prefix not in prefix_counts:
+            raise ValueError(f"Provided prefix '{prefix}' does not match any files.")
+
+    max_subunits, num_structures_dict = determine_subunit_info(files, prefix)
+    if max_subunits == 0:
+        raise ValueError(f"No valid structure files found matching prefix '{prefix}'.")
+
+    iptm_data = extract_iptm_scores(files, prefix, max_subunits, num_structures_dict)
+    if not iptm_data:
+        raise ValueError("No ipTM scores could be extracted from the files.")
+
+    return prefix, predict_oligomeric_state(iptm_data, threshold, min_structures)
 
 def format_output(results, prefix):
     """Format prediction results for display."""
@@ -209,47 +246,11 @@ def main():
         else:
             input_path = args.input
         
-        # Get files
-        files = glob.glob(os.path.join(input_path, '*'))
-        
-        # Auto-detect or verify prefix
-        if not args.prefix:
-            detected_prefix, is_consistent, prefix_counts = detect_prefix(files)
-            if not detected_prefix:
-                raise ValueError("Could not auto-detect prefix. Please provide using -p option.")
-            
-            if not is_consistent:
-                prefixes_info = ', '.join([f"'{p}' ({c} files)" for p, c in prefix_counts.items()])
-                print(f"Warning: Multiple prefixes detected: {prefixes_info}")
-                print(f"Using most common prefix: '{detected_prefix}'")
-            
-            prefix = detected_prefix
-        else:
-            _, _, prefix_counts = detect_prefix(files)
-            if args.prefix not in prefix_counts:
-                raise ValueError(f"Provided prefix '{args.prefix}' does not match any files.")
-            prefix = args.prefix
-        
+        prefix, results = predict_from_directory(
+            input_path, args.prefix, args.threshold, args.min_structures)
         print(f"Using prefix: '{prefix}'")
-        
-        # Determine available subunit counts and structures
-        max_subunits, num_structures_dict = determine_subunit_info(files, prefix)
-        
-        if max_subunits == 0:
-            raise ValueError(f"No valid structure files found matching prefix '{prefix}'.")
-        
-        print(f"Found structures for subunit counts: {sorted(num_structures_dict.keys())}")
-        
-        # Extract ipTM scores
-        iptm_data = extract_iptm_scores(files, prefix, max_subunits, num_structures_dict)
-        
-        if not iptm_data:
-            raise ValueError("No ipTM scores could be extracted from the files.")
-            
-        
-        # Predict oligomeric state
-        results = predict_oligomeric_state(iptm_data, args.threshold, args.min_structures)
-        
+        print(f"Found structures for subunit counts: {sorted(results['all_scores'].keys())}")
+
         # Display results
         format_output(results, prefix)
         

@@ -7,8 +7,9 @@
 #
 # Versions match those used in the PHLEGM manuscript
 # (ColabFold v1.5.5, MMseqs2 15.6f452).
-# dm-haiku is pinned because ColabFold 1.5.5 only sets a lower bound, and
-# haiku >= 0.0.13 requires a newer JAX than ColabFold 1.5.5 supports.
+# dm-haiku and flax are pinned because ColabFold 1.5.5 only sets lower bounds:
+# haiku >= 0.0.13 and recent flax need a newer JAX than ColabFold 1.5.5 supports
+# (JAX 0.4.23-0.4.25). haiku 0.0.12 imports flax, so both are needed.
 name: phlegm
 channels:
   - conda-forge
@@ -20,6 +21,7 @@ dependencies:
   - setuptools>=61
   - colabfold=1.5.5
   - dm-haiku=0.0.12
+  - flax=0.8.2
   - mmseqs2=15.6f452
   - numpy
   - pandas

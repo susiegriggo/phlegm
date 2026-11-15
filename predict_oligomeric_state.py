@@ -169,9 +169,11 @@ def predict_oligomeric_state(iptm_data, threshold=0.65, min_structures=2):
     
     return results
 
-def predict_from_directory(input_path, prefix=None, threshold=0.65, min_structures=2):
+def predict_from_directory(input_path, prefix=None, threshold=0.65, min_structures=2,
+                           subunits=None):
     """
     Run the full prediction on a directory of ColabFold outputs for one protein.
+    If subunits is given, only those stoichiometries are considered.
 
     Returns:
         (prefix, results) tuple. Raises ValueError if no usable outputs are found.
@@ -197,6 +199,8 @@ def predict_from_directory(input_path, prefix=None, threshold=0.65, min_structur
         raise ValueError(f"No valid structure files found matching prefix '{prefix}'.")
 
     iptm_data = extract_iptm_scores(files, prefix, max_subunits, num_structures_dict)
+    if subunits is not None:
+        iptm_data = {n: v for n, v in iptm_data.items() if n in subunits}
     if not iptm_data:
         raise ValueError("No ipTM scores could be extracted from the files.")
 

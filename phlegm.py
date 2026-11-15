@@ -36,7 +36,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 from predict_oligomeric_state import predict_from_directory  # noqa: E402
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 VALID_AA = set("ACDEFGHIKLMNPQRSTVWYXBZUO")
 REGISTRY = Path("input") / "proteins.tsv"
@@ -349,6 +349,20 @@ def write_oligomer_msa(protein, monomer_a3m, n_subunits, out_path):
     tmp.replace(out_path)
 
 
+def check_fold_complete(protein, args, outdir):
+    """colabfold_batch exits successfully even when a job fails (e.g. out of GPU
+    memory), so check that every stoichiometry left its '.done.txt' marker."""
+    sdir = outdir / "structures" / protein["id"]
+    missing = [n for n in range(args.min_oligomer, args.max_oligomer + 1)
+               if not (sdir / f"{protein['id']}.{n}.done.txt").is_file()]
+    if missing:
+        raise PhlegmError(
+            f"ColabFold did not finish the {', '.join(f'{n}-mer' for n in missing)} "
+            f"(often because the GPU ran out of memory; see {sdir / 'log.txt'}). "
+            "Re-running 'phlegm fold' retries only the missing stoichiometries, "
+            "e.g. on a GPU with more memory.")
+
+
 def step_fold(proteins, args, outdir):
     if getattr(args, "shard", None):
         i, n = args.shard
@@ -387,6 +401,8 @@ def step_fold(proteins, args, outdir):
         cmd += shlex.split(args.colabfold_args or "")
         try:
             run_cmd(cmd, args.dry_run)
+            if not args.dry_run:
+                check_fold_complete(p, args, outdir)
         except PhlegmError as e:
             if not args.keep_going:
                 raise
@@ -417,7 +433,8 @@ def step_predict(proteins, args, outdir):
             rows.append(row)
             continue
         try:
-            _, res = predict_from_directory(str(sdir), p["id"], args.threshold, args.min_structures)
+            _, res = predict_from_directory(str(sdir), p["id"], args.threshold, args.min_structures,
+                                            subunits=subunits)
         except (ValueError, OSError) as e:
             log.warning("%s: could not predict state: %s", p["id"], e)
             row["status"] = f"failed: {e}"

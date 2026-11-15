@@ -2,11 +2,13 @@
 #
 #   conda env create -f environment.yml     # add -n NAME or -p PATH to choose
 #   conda activate phlegm
-#   bash install.sh                          # installs the 'phlegm' command,
-#                                            # GPU JAX and AlphaFold weights
+#   bash install.sh                          # installs the 'phlegm' command
+#                                            # and (on Linux) GPU JAX
 #
 # Versions match those used in the PHLEGM manuscript
 # (ColabFold v1.5.5, MMseqs2 15.6f452).
+# dm-haiku is pinned because ColabFold 1.5.5 only sets a lower bound, and
+# haiku >= 0.0.13 requires a newer JAX than ColabFold 1.5.5 supports.
 name: phlegm
 channels:
   - conda-forge
@@ -17,6 +19,7 @@ dependencies:
   - pip
   - setuptools>=61
   - colabfold=1.5.5
+  - dm-haiku=0.0.12
   - mmseqs2=15.6f452
   - numpy
   - pandas

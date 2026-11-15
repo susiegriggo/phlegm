@@ -78,6 +78,14 @@ fi
 
 echo "==> Checking installation"
 colabfold_batch --help >/dev/null
+# Import ColabFold's model code: catches JAX/haiku version mismatches now
+# rather than at the first 'phlegm msa' or 'phlegm fold'.
+"$PY" -c "import colabfold.alphafold.models" 2>/dev/null || {
+    echo "Error: ColabFold's model code failed to import. Details:" >&2
+    "$PY" -c "import colabfold.alphafold.models" >&2 || true
+    echo "Try: conda env update -f $SCRIPT_DIR/environment.yml   (pins compatible versions)" >&2
+    exit 1
+}
 "$CONDA_PREFIX/bin/phlegm" --help >/dev/null
 
 cat <<EOF

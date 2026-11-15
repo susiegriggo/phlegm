@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "phlegm"
-version = "1.1.0"
+version = "1.0.0"
 description = "Phage Homomer Level Estimate and Generation Method: predict homo-oligomeric states with AlphaFold-Multimer"
 readme = "README.md"
 license = { file = "LICENSE" }

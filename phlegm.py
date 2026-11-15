@@ -36,7 +36,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 from predict_oligomeric_state import predict_from_directory  # noqa: E402
 
-__version__ = "1.1.0"
+__version__ = "1.0.0"
 
 VALID_AA = set("ACDEFGHIKLMNPQRSTVWYXBZUO")
 REGISTRY = Path("input") / "proteins.tsv"

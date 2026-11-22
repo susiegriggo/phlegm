@@ -1,6 +1,7 @@
 """
 phlegm lookup: assign homo-oligomeric states to proteins from the precomputed
-PHLEGM resource, using each protein's PHROG assignment (e.g. from pharokka or phold).
+PHLEGM resource, using each protein's PHROG assignment (pharokka or phold GenBank or
+TSV output, or a two-column table).
 
 The resource (data/phlegm_phrog_predictions.csv.gz; Supplementary Table of the
 PHLEGM manuscript) holds the PHLEGM prediction for the representative sequence of
@@ -64,6 +65,50 @@ def load_resource(path=DEFAULT_RESOURCE):
     if not resource:
         raise PhlegmLookupError(f"No PHROG rows could be read from {path}")
     return resource
+
+
+def is_genbank(path):
+    """True if the first non-blank line of the file is a GenBank LOCUS line."""
+    with open_text(path) as fh:
+        for line in fh:
+            if line.strip():
+                return line.startswith("LOCUS")
+    return False
+
+
+def read_genbank(path):
+    """
+    GenBank from pharokka or phold (e.g. phold.gbk, pharokka.gbk) ->
+    ([(protein_id, phrog_or_None)], {protein_id: translation}).
+    Uses each CDS's /phrog and /translation; the ID is /ID, else /locus_tag, else /protein_id.
+    """
+    try:
+        from Bio import SeqIO
+    except ImportError:
+        raise PhlegmLookupError("Reading GenBank input needs Biopython (pip install biopython)")
+    entries, proteins, n_unnamed = [], {}, 0
+    with open_text(path) as fh:
+        for record in SeqIO.parse(fh, "genbank"):
+            for feat in record.features:
+                if feat.type != "CDS":
+                    continue
+                q = feat.qualifiers
+                pid = next((q[k][0] for k in ("ID", "locus_tag", "protein_id") if q.get(k)), None)
+                if pid is None:
+                    n_unnamed += 1
+                    continue
+                entries.append((pid, parse_phrog(q.get("phrog", [""])[0])))
+                if q.get("translation"):
+                    proteins[pid] = q["translation"][0].replace("*", "").upper()
+    if n_unnamed:
+        log.warning("%d CDS feature(s) in %s have no /ID or /locus_tag and were skipped",
+                    n_unnamed, path)
+    if not entries:
+        raise PhlegmLookupError(f"No CDS features found in GenBank file {path}")
+    if not any(phrog is not None for _, phrog in entries):
+        log.warning("No CDS in %s has a /phrog qualifier; is this pharokka or phold output?", path)
+    log.info("Reading %d CDS from GenBank file %s", len(entries), path)
+    return entries, proteins
 
 
 def read_annotations(path):
@@ -170,8 +215,15 @@ def run_lookup(annotations, outdir, proteins_fasta=None, resource_path=DEFAULT_R
     outdir = Path(outdir)
     resource = load_resource(resource_path)
     log.info("PHLEGM resource: %d PHROGs (%s)", len(resource), resource_path)
-    entries = read_annotations(annotations)
-    proteins = read_proteins(proteins_fasta) if proteins_fasta else {}
+    if is_genbank(annotations):
+        entries, proteins = read_genbank(annotations)
+        if proteins_fasta:
+            proteins = read_proteins(proteins_fasta)
+        else:
+            proteins_fasta = annotations
+    else:
+        entries = read_annotations(annotations)
+        proteins = read_proteins(proteins_fasta) if proteins_fasta else {}
     aligner = make_aligner() if proteins else None
     if proteins:
         n_x = sum(s.count("X") for s in proteins.values())

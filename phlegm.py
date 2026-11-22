@@ -20,7 +20,7 @@ Examples
   phlegm msa -i proteins.fasta -o out --db /path/to/colabfold_db    # CPU node
   phlegm fold -o out --shard 3/20                                   # GPU job-array task
   phlegm predict -o out
-  phlegm lookup -i phold_per_cds_predictions.tsv --proteins prodigal-gv.faa -o out
+  phlegm lookup -i phold.gbk -o out
 """
 
 import argparse
@@ -616,16 +616,19 @@ def build_parser():
                        help="Look up predicted states in the precomputed PHLEGM resource",
                        description="Assign each protein the PHLEGM prediction of its PHROG from "
                                    "the precomputed resource (22,554 PHROG representatives). "
-                                   "Input is pharokka or phold output, or a two-column table of "
+                                   "Input is pharokka or phold output (GenBank or TSV), or a "
+                                   "two-column table of "
                                    "protein ID and PHROG. Proteins without a result can be "
                                    "folded with 'phlegm run'.")
     p.add_argument("-i", "--input", required=True,
-                   help="phold *_per_cds_predictions.tsv, pharokka *_cds_final_merged_output.tsv, "
-                        "or a TSV/CSV of protein ID and PHROG")
+                   help="phold or pharokka GenBank (phold.gbk, pharokka.gbk; recommended, includes the "
+                        "protein sequences), phold *_per_cds_predictions.tsv, pharokka "
+                        "*_cds_final_merged_output.tsv, or a TSV/CSV of protein ID and PHROG")
     p.add_argument("--proteins",
-                   help="FASTA of the protein sequences (e.g. pharokka's prodigal-gv.faa). Adds "
-                        "identity to the PHROG representative and writes to_fold.faa with the "
-                        "proteins that need 'phlegm run'.")
+                   help="FASTA of the protein sequences (e.g. pharokka's prodigal-gv.faa), for table "
+                        "input; GenBank input already contains them. Adds identity to the PHROG "
+                        "representative and writes to_fold.faa with the proteins that need "
+                        "'phlegm run'.")
     p.add_argument("--resource", default=str(phlegm_lookup.DEFAULT_RESOURCE),
                    help="Per-PHROG PHLEGM prediction table")
     sub.add_parser("download-weights", parents=[weights], formatter_class=fmt,

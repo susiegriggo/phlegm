@@ -53,11 +53,10 @@ phlegm run -i test_data/phrog_807.faa -o phlegm_test --max-oligomer 6 --num-mode
 The PHLEGM resource holds predictions for the representative sequences of 22,554 PHROGs (`data/phlegm_phrog_predictions.csv.gz`, also the manuscript's supplementary table). If your proteins already have PHROG assignments, for example from [pharokka](https://github.com/gbouras13/pharokka) or [phold](https://github.com/gbouras13/phold), `phlegm lookup` gives each protein the prediction of its PHROG in seconds. It needs no GPU, MSAs or AlphaFold weights:
 
 ```bash
-phlegm lookup -i phold_out/phold_per_cds_predictions.tsv \
-              --proteins pharokka_out/prodigal-gv.faa -o lookup_out
+phlegm lookup -i phold_out/phold.gbk -o lookup_out        # or pharokka_out/pharokka.gbk
 ```
 
-`-i` accepts phold's `*_per_cds_predictions.tsv`, pharokka's `*_cds_final_merged_output.tsv`, or any TSV/CSV whose first two columns are a protein ID and a PHROG (`phrog_123` or `123`). `--proteins` is optional. With it, PHLEGM reports how similar each protein is to its PHROG's representative and writes `to_fold.faa`, the proteins without a lookup result, ready for step 3. Use unmasked sequences (e.g. pharokka's `prodigal-gv.faa`): residues masked as `X` are ignored when computing identity.
+The GenBank output of phold or pharokka is the simplest input: it holds each CDS's PHROG (`/phrog`) and protein sequence (`/translation`). `-i` also accepts phold's `*_per_cds_predictions.tsv`, pharokka's `*_cds_final_merged_output.tsv`, or any TSV/CSV whose first two columns are a protein ID and a PHROG (`phrog_123` or `123`). With table input, add the protein sequences with `--proteins` (optional), e.g. `--proteins pharokka_out/prodigal-gv.faa`. Given the sequences, PHLEGM reports how similar each protein is to its PHROG's representative and writes `to_fold.faa`, the proteins without a lookup result, ready for step 3. Use unmasked sequences (the GenBank translations or pharokka's `prodigal-gv.faa`, not phold's `phold_aa.fasta`): residues masked as `X` are ignored when computing identity.
 
 Results are written to `lookup_out/phlegm_lookup.tsv`:
 
@@ -68,7 +67,7 @@ Results are written to `lookup_out/phlegm_lookup.tsv`:
 | `predicted_state` / `predicted_subunits` / `max_mean_iptm` | the PHLEGM prediction for the PHROG representative |
 | `phrog_annotation`, `phrog_category` | PHROG functional annotation |
 | `protein_length_aa`, `representative_length_aa` | lengths of the protein and of the PHROG representative |
-| `identity_to_representative`, `coverage_of_protein` | local alignment identity (%) and the percentage of the protein covered (needs `--proteins`) |
+| `identity_to_representative`, `coverage_of_protein` | local alignment identity (%) and the percentage of the protein covered (needs sequences: GenBank input or `--proteins`) |
 | `structure_url` | the PHLEGM structure of the representative: the predicted oligomer, or the monomer for monomer calls |
 | `note` | why a protein has no prediction, or a warning if it is only distantly related to the representative |
 
@@ -146,7 +145,7 @@ For more than a few dozen proteins, use a local database instead of the public s
 | `-t/--threshold` | predict, run | mean ipTM threshold for calling a multimer (default 0.65) |
 | `--extended-metrics` | predict, run | also compute pDockQ2, interface contacts and PAE with `extract_metrics.py` |
 | `--dry-run` | msa, fold, run | print commands without running them |
-| `--proteins FASTA` / `--resource TABLE` | lookup | protein sequences for identity and `to_fold.faa`; an alternative per-PHROG table |
+| `--proteins FASTA` / `--resource TABLE` | lookup | protein sequences for table input (GenBank input already has them); an alternative per-PHROG table |
 
 Output layout:
 ```

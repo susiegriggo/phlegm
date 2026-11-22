@@ -187,7 +187,11 @@ def main(input, output, prefix):
                 j = j[0]
                 
                 f = json.load(open(j, 'r'))
-                
+                # ColabFold writes null scores when a prediction failed numerically (NaN)
+                if f.get('iptm') is None or not f.get('plddt') or None in f.get('plddt'):
+                    print(f"Warning: {os.path.basename(j)} has NaN scores (failed prediction), skipping...")
+                    continue
+
                 p = [i for i in files if s_p in i and 'pdb' in i]
                 if not p:
                     print(f"Warning: No PDB file found for {s_p}, skipping...")

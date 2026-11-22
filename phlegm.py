@@ -7,6 +7,8 @@ Commands
   phlegm fold     Predict 2-mer..10-mer complexes           (GPU; needs only AlphaFold weights)
   phlegm predict  Call oligomeric states from mean ipTM     (anywhere; seconds)
   phlegm run      msa + fold + predict on one machine
+  phlegm lookup   Look up predicted states for proteins with a PHROG assignment (e.g. from
+                  pharokka or phold) in the precomputed PHLEGM resource      (anywhere; seconds)
   phlegm download-weights   Fetch the AlphaFold-Multimer weights (~4 GB) ahead of time,
                             e.g. on an HPC login node when GPU nodes have no internet
 
@@ -18,6 +20,7 @@ Examples
   phlegm msa -i proteins.fasta -o out --db /path/to/colabfold_db    # CPU node
   phlegm fold -o out --shard 3/20                                   # GPU job-array task
   phlegm predict -o out
+  phlegm lookup -i phold.gbk -o out
 """
 
 import argparse
@@ -35,8 +38,9 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 from predict_oligomeric_state import predict_from_directory  # noqa: E402
+import phlegm_lookup  # noqa: E402
 
-__version__ = "1.0.1"
+__version__ = "1.1.0"
 
 VALID_AA = set("ACDEFGHIKLMNPQRSTVWYXBZUO")
 REGISTRY = Path("input") / "proteins.tsv"
@@ -508,6 +512,15 @@ def cmd_download_weights(args, outdir=None):
     return 0
 
 
+def cmd_lookup(args, outdir):
+    try:
+        phlegm_lookup.run_lookup(args.input, outdir, proteins_fasta=args.proteins,
+                                 resource_path=args.resource)
+    except phlegm_lookup.PhlegmLookupError as e:
+        raise PhlegmError(str(e))
+    return 0
+
+
 def cmd_run(args, outdir):
     proteins = load_fasta_proteins(args.input)
     save_registry(proteins, outdir)
@@ -599,6 +612,25 @@ def build_parser():
     sub.add_parser("run", parents=[inp, common, msa, stoich, fold, weights, pred, dry], formatter_class=fmt,
                    help="Run msa, fold and predict on one machine",
                    description="Run the whole pipeline (msa, fold, predict) on one machine.")
+    p = sub.add_parser("lookup", parents=[common], formatter_class=fmt,
+                       help="Look up predicted states in the precomputed PHLEGM resource",
+                       description="Assign each protein the PHLEGM prediction of its PHROG from "
+                                   "the precomputed resource (22,554 PHROG representatives). "
+                                   "Input is pharokka or phold output (GenBank or TSV), or a "
+                                   "two-column table of "
+                                   "protein ID and PHROG. Proteins without a result can be "
+                                   "folded with 'phlegm run'.")
+    p.add_argument("-i", "--input", required=True,
+                   help="phold or pharokka GenBank (phold.gbk, pharokka.gbk; recommended, includes the "
+                        "protein sequences), phold *_per_cds_predictions.tsv, pharokka "
+                        "*_cds_final_merged_output.tsv, or a TSV/CSV of protein ID and PHROG")
+    p.add_argument("--proteins",
+                   help="FASTA of the protein sequences (e.g. pharokka's prodigal-gv.faa), for table "
+                        "input; GenBank input already contains them. Adds identity to the PHROG "
+                        "representative and writes to_fold.faa with the proteins that need "
+                        "'phlegm run'.")
+    p.add_argument("--resource", default=str(phlegm_lookup.DEFAULT_RESOURCE),
+                   help="Per-PHROG PHLEGM prediction table")
     sub.add_parser("download-weights", parents=[weights], formatter_class=fmt,
                    help="Download the AlphaFold-Multimer weights (~4 GB)",
                    description="Download the AlphaFold-Multimer v3 weights. 'phlegm fold' does this "
@@ -656,7 +688,8 @@ def main(argv=None):
     setup_logging(outdir, args)
     log.info("PHLEGM %s: %s", __version__, args.command)
 
-    commands = {"msa": cmd_msa, "fold": cmd_fold, "predict": cmd_predict, "run": cmd_run}
+    commands = {"msa": cmd_msa, "fold": cmd_fold, "predict": cmd_predict, "run": cmd_run,
+                "lookup": cmd_lookup}
     try:
         return commands[args.command](args, outdir)
     except (PhlegmError, OSError) as e:

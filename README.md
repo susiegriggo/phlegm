@@ -1,4 +1,4 @@
-[![DOI](https://zenodo.org/badge/548652990.svg)](https://doi.org/10.5281/zenodo.8128898)
+
 # phlegm
 
 **P**hage **H**omomer **L**evel **E**stimate and **G**eneration **M**ethod 
